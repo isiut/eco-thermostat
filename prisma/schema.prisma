@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Building {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  address   String?
+  rooms     Room[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Room {
+  id                   String    @id @default(cuid())
+  name                 String
+  buildingId           String
+  building             Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  capacity             Int
+  cleanlinessScore     Float     @default(0)
+  sustainabilityScore  Float     @default(0)
+  energyEfficiency     String    @default("B")
+  costScore            Float     @default(0)
+  features             String[]
+  bookings             Booking[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([name, buildingId])
+}
+
+model Booking {
+  id          String   @id @default(cuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId      String?
+  userName    String
+  userEmail   String
+  date        DateTime
+  startTime   String
+  endTime     String
+  purpose     String?
+  status      String   @default("confirmed")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([roomId, date])
+}
