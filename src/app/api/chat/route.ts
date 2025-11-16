@@ -10,7 +10,7 @@ const groq = new Groq({
 async function getMLPredictions(building?: string, time?: string, date?: string, preferences?: string[]) {
   try {
     // Replace with your friends' actual ML API endpoint when ready
-    const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5000/predict-rooms';
+    const ML_API_URL = process.env.ML_API_URL || 'https://energy-prediction-api-270708517479.us-central1.run.app/';
     
     const response = await fetch(ML_API_URL, {
       method: 'POST',
