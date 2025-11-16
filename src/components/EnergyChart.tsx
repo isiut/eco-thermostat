@@ -7,19 +7,26 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 
 type EnergyData = Record<string, number>;
 
-export default function EnergyChart() {
+export default function EnergyChart({
+  selectedTime,
+}: {
+  selectedTime?: string;
+}) {
   const [data, setData] = useState<EnergyData>({});
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [hour, setHour] = useState<string>("00");
+  // selectedTime is e.g. "9:00 AM" from the page; we'll convert to hour
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  async function fetchData() {
+  async function fetchData(hourParam?: string) {
     try {
-      const res = await fetch("/api/energy");
+      const url = hourParam
+        ? `/api/energy?hour=${encodeURIComponent(hourParam)}`
+        : "/api/energy";
+      const res = await fetch(url);
       if (!res.ok) return;
       const json = await res.json();
       setData(json ?? {});
@@ -29,28 +36,28 @@ export default function EnergyChart() {
   }
   // ------------------------------------------------------------------------------------
 
-  // Automatically update `hour` to the current hour and fetch server data
-  useEffect(() => {
-    const updateHour = () => {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, "0");
-      setHour(h);
-    };
+  // Convert selectedTime (e.g. "9:00 AM") -> two-digit hour string "09"
+  function timeStringToHour(t?: string): string | null {
+    if (!t) return null;
+    const m = String(t)
+      .trim()
+      .match(/(\d{1,2})(?::\d{2})?\s*(AM|PM)/i);
+    if (!m) return null;
+    let h = Number(m[1]);
+    const ampm = m[2].toUpperCase();
+    if (ampm === "PM" && h < 12) h += 12;
+    if (ampm === "AM" && h === 12) h = 0;
+    return String(h).padStart(2, "0");
+  }
 
-    updateHour();
-    const id = setInterval(updateHour, 30 * 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Fetch data automatically when the hour changes (or on mount), and periodically
+  // Fetch data when `selectedTime` changes (or on mount). If `selectedTime` is empty,
+  // server will use its current hour.
   useEffect(() => {
-    // initial fetch
-    fetchData();
-    // refresh every minute
-    const id = setInterval(fetchData, 60 * 1000);
+    const hour = timeStringToHour(selectedTime) ?? undefined;
+    fetchData(hour);
+    const id = setInterval(() => fetchData(hour), 60 * 1000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hour]);
+  }, [selectedTime]);
 
   const labels = Object.keys(data);
   const values = Object.values(data);

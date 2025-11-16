@@ -510,7 +510,7 @@ export default function RoomScheduler() {
           </div>
 
           <div className="p-4">
-            <EnergyChart />
+            <EnergyChart selectedTime={selectedTime} />
           </div>
 
           {/* Messages */}

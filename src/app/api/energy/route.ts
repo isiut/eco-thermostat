@@ -6,10 +6,9 @@ import path from "path";
 // Note: this won't persist across server restarts or in serverless edge environments.
 let latestEnergy: Record<string, number> | null = null;
 
-async function tryReadCsvForCurrentHour(): Promise<Record<
-  string,
-  number
-> | null> {
+async function tryReadCsvForCurrentHour(
+  targetHourFromParam?: number
+): Promise<Record<string, number> | null> {
   try {
     // Look for a CSV in the project `data/energy.csv` (user can place their file there)
     const csvPath = path.join(process.cwd(), "data", "energy.csv");
@@ -32,18 +31,35 @@ async function tryReadCsvForCurrentHour(): Promise<Record<
 
     const tsCol = "Timestamp (Hour Ending)";
     const now = new Date();
-    const targetHour = now.getHours();
+    const targetHour =
+      typeof targetHourFromParam === "number"
+        ? targetHourFromParam
+        : now.getHours();
 
-    // Helper: parse timestamp strings similar to client logic
+    // Helper: parse timestamp strings robustly for formats like
+    // "11/9/2025 12 a.m. EST" or "11/9/2025 12:00 AM"
     function parseTs(s: string) {
       if (!s) return null;
-      let str = String(s);
-      str = str.replace(/\s+[A-Z]{2,4}$/, "");
-      str = str.replace(/\b(a\.m\.|a\.m|am)\b/i, "AM");
-      str = str.replace(/\b(p\.m\.|p\.m|pm)\b/i, "PM");
-      str = str.replace(/\./g, "");
-      const d = new Date(str);
-      if (isNaN(d.getTime())) return null;
+      const raw = String(s).trim();
+      // regex to capture M/D/YYYY H[:MM] [am|pm] (optional TZ)
+      const m = raw.match(
+        /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|a\.m|am|p\.m\.|p\.m|pm|AM|PM)?/i
+      );
+      if (!m) return null;
+      const month = Number(m[1]);
+      const day = Number(m[2]);
+      const year = Number(m[3]);
+      let hour = Number(m[4]);
+      const minute = m[5] ? Number(m[5]) : 0;
+      const ampm = m[6] ? String(m[6]).toLowerCase() : null;
+
+      if (ampm) {
+        if (/p/.test(ampm) && hour < 12) hour += 12;
+        if (/a/.test(ampm) && hour === 12) hour = 0;
+      }
+
+      // Construct a Date in server local timezone (ignore TZ token in CSV)
+      const d = new Date(year, month - 1, day, hour, minute, 0, 0);
       return d;
     }
 
@@ -72,12 +88,25 @@ async function tryReadCsvForCurrentHour(): Promise<Record<
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   // Return in-memory stored data if present
   if (latestEnergy) return NextResponse.json(latestEnergy);
 
-  // Otherwise try to read CSV from disk and compute for current hour
-  const fromFile = await tryReadCsvForCurrentHour();
+  // Check for ?hour= param
+  let paramHour: number | undefined = undefined;
+  try {
+    const url = new URL(request.url);
+    const hourParam = url.searchParams.get("hour");
+    if (hourParam) {
+      const h = Number(hourParam);
+      if (!Number.isNaN(h) && h >= 0 && h <= 23) paramHour = h;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Otherwise try to read CSV from disk and compute for requested hour
+  const fromFile = await tryReadCsvForCurrentHour(paramHour);
   if (fromFile) return NextResponse.json(fromFile);
 
   return NextResponse.json({});
