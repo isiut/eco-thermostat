@@ -151,7 +151,7 @@ REMEMBER:
 - Keep responses under 150 words unless user asks for details`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-70b-versatile', // FREE and fast!
+      model: 'llama-3.3-70b-versatile', // FREE and fast!
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages.map((msg: any) => ({
