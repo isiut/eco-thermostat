@@ -1,0 +1,138 @@
+================================================================
+ENERGY PREDICTION API - DEPLOYMENT INSTRUCTIONS
+================================================================
+
+PREREQUISITES:
+--------------
+1. Google Cloud account with billing enabled
+2. gcloud CLI installed (https://cloud.google.com/sdk/docs/install)
+3. Docker installed (for local testing)
+4. Model files generated: energy_prediction_model.pkl and label_encoders.pkl
+
+
+LOCAL TESTING:
+--------------
+1. Install dependencies:
+   pip install -r requirements.txt
+
+2. Run the Flask app locally:
+   python main.py
+
+3. Test the API (in another terminal):
+   python test_api.py
+
+   Or use curl:
+   curl http://localhost:8080/
+   curl -X POST http://localhost:8080/predict -H "Content-Type: application/json" -d '{"room_id":"BR 116","room_type":"Classroom","duration":2.0,"ambient_temp":85.0,"base_temp":72.0,"occupancy":24}'
+
+
+DOCKER TESTING (LOCAL):
+-----------------------
+1. Build the Docker image:
+   docker build -t energy-prediction-api .
+
+2. Run the container:
+   docker run -p 8080:8080 energy-prediction-api
+
+3. Test as above using http://localhost:8080
+
+
+DEPLOY TO GOOGLE CLOUD RUN:
+----------------------------
+Option 1: Using the deployment script
+   1. Edit deploy.sh and set your PROJECT_ID
+   2. Make it executable: chmod +x deploy.sh
+   3. Run: ./deploy.sh
+
+Option 2: Manual deployment
+   1. Set your project:
+      gcloud config set project YOUR_PROJECT_ID
+
+   2. Deploy from source:
+      gcloud run deploy energy-prediction-api \
+        --source . \
+        --region us-central1 \
+        --platform managed \
+        --allow-unauthenticated \
+        --memory 512Mi \
+        --cpu 1 \
+        --timeout 300
+
+   3. Follow the prompts and wait for deployment
+
+   4. Get your service URL:
+      gcloud run services describe energy-prediction-api \
+        --region us-central1 \
+        --format 'value(status.url)'
+
+
+API ENDPOINTS:
+--------------
+GET  /                  - Health check
+GET  /available_rooms   - List available rooms and types
+POST /predict           - Make energy predictions
+
+
+EXAMPLE API CALLS:
+------------------
+1. Single prediction:
+   curl -X POST https://your-service-url.run.app/predict \
+     -H "Content-Type: application/json" \
+     -d '{
+       "room_id": "BR 116",
+       "room_type": "Classroom",
+       "duration": 2.0,
+       "ambient_temp": 85.0,
+       "base_temp": 72.0,
+       "occupancy": 24
+     }'
+
+2. Batch predictions:
+   curl -X POST https://your-service-url.run.app/predict \
+     -H "Content-Type: application/json" \
+     -d '{
+       "predictions": [
+         {
+           "room_id": "BR 116",
+           "room_type": "Classroom",
+           "duration": 2.0,
+           "ambient_temp": 85.0,
+           "base_temp": 72.0,
+           "occupancy": 24
+         },
+         {
+           "room_id": "BR 234",
+           "room_type": "Classroom",
+           "duration": 1.5,
+           "ambient_temp": 60.0,
+           "base_temp": 72.0,
+           "occupancy": 28
+         }
+       ]
+     }'
+
+3. Get available rooms:
+   curl https://your-service-url.run.app/available_rooms
+
+
+TROUBLESHOOTING:
+----------------
+- If deployment fails, check that all required files are present
+- Ensure model files (*.pkl) are in the same directory
+- Check Cloud Run logs: gcloud run logs read --service energy-prediction-api
+- Verify billing is enabled on your GCP project
+- Make sure you have the necessary IAM permissions
+
+
+IMPORTANT FILES:
+----------------
+- main.py: Flask application with API endpoints
+- requirements.txt: Python dependencies
+- Dockerfile: Container configuration
+- energy_prediction_model.pkl: Trained XGBoost model
+- label_encoders.pkl: Label encoders for categorical variables
+- test_api.py: API testing script
+- deploy.sh: Automated deployment script
+
+================================================================
+
